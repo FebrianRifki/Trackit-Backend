@@ -9,6 +9,16 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    public function logout(Request $request) {
+        $request->user()->currentAccessToken()->delete();
+        
+        return response()->json([
+            'success' => true,
+            'status' => 200,
+            'message' => 'Logout successful'
+        ])->withCookie(cookie()->forget('sanctum_token'));
+    }
+
     public function register(Request $request){
         $validator = Validator::make($request->all(), [
             'name' => 'required',
@@ -36,6 +46,7 @@ class AuthController extends Controller
     }
 
     public function login(Request $request){
+       try {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
             'password' => 'required',
@@ -60,15 +71,23 @@ class AuthController extends Controller
             ], 401);
         }
     
-        $token = $user->createToken('auth-token')->plainTextToken;
-    
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        $cookie = cookie('sanctum_token', $token, 60 * 24 * 7); // 7 days
+
         return response()->json([
             'success' => true,
             'status' => 200,
-            'message' => 'User logged in successfully',
-            'data' => [
-                'token' => $token,
-            ],
-        ], 200);
+            'message' => 'Login successful',
+            'user' => $user,
+        ])->withCookie($cookie);
+       } catch (\Throwable $th) {
+        return response()->json([
+            'success' => false,
+            'status' => 500,
+            'message' => 'Internal Server Error',
+            'errors' => $th->getMessage(),
+        ], 500);
+       }
     }
 }
